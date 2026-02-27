@@ -12,7 +12,7 @@ private:
 	ADDRINFO* addrResult;
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
-	WORD ver{MAKEWORD(2, 2)};
+	WORD ver{ MAKEWORD(2, 2) };
 	std::string ip;
 	std::string port;
 public:
@@ -46,7 +46,7 @@ public:
 		{
 			std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
 			WSACleanup();
-			
+
 			return -1;
 		}
 
@@ -68,7 +68,7 @@ public:
 			closesocket(ListenSocket);
 			freeaddrinfo(addrResult);
 			WSACleanup();
-			
+
 			return -1;
 		}
 
@@ -78,7 +78,7 @@ public:
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
-			
+
 			return -1;
 		}
 
@@ -138,8 +138,7 @@ private:
 	WSADATA data;
 	ADDRINFO hints;
 	ADDRINFO* addrResult;
-	SOCKET ListenSocket{ INVALID_SOCKET };
-	SOCKET ClientSocket{ INVALID_SOCKET };
+	SOCKET ConnectSocket{ INVALID_SOCKET };
 	WORD ver{ MAKEWORD(2, 2) };
 public:
 	tcpClient(std::string ipArg, std::string portArg) : ip(ipArg), port(portArg)
@@ -147,14 +146,14 @@ public:
 
 	}
 
-	void shutdownServer()
+	void shutdownClient()
 	{
-		closesocket(ListenSocket);
+		closesocket(ConnectSocket);
 		freeaddrinfo(addrResult);
 		WSACleanup();
 	}
 
-	int startServer()
+	int startClient()
 	{
 		if (WSAStartup(ver, &data) != 0)
 		{
@@ -166,7 +165,6 @@ public:
 		hints.ai_family = AF_INET;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
-		hints.ai_flags = AI_PASSIVE;
 
 		if (getaddrinfo("localhost", "4096", &hints, &addrResult) != 0)
 		{
@@ -178,8 +176,8 @@ public:
 			return -1;
 		}
 
-		ListenSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
-		if (ListenSocket == INVALID_SOCKET)
+		ConnectSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
+		if (ConnectSocket == INVALID_SOCKET)
 		{
 			std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
 			freeaddrinfo(addrResult);
@@ -187,46 +185,18 @@ public:
 			return -1;
 		}
 
-		if (socket(ListenSocket, addrResult->ai_socktype, addrResult->ai_protocol) == SOCKET_ERROR)
-		{
-			closesocket(ListenSocket);
-			freeaddrinfo(addrResult);
-			WSACleanup();
-			std::cout << std::format("Socket creating error, code:{}\n", WSAGetLastError());
-			return -1;
-		}
-		
-		std::cout << std::format("Started listening at ip {} and port {}", ip, port);
-
-		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
-		{
-			freeaddrinfo(addrResult);
-			WSACleanup();
-			std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
-			return -1;
-		}
-
 		return 0;
 	}
 
-	int acceptSocket()
+	void connectToServer()
 	{
-		ClientSocket = accept(ListenSocket, NULL, NULL);
-		if (ClientSocket == INVALID_SOCKET)
-		{
-			std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
-			closesocket(ListenSocket);
-			freeaddrinfo(addrResult);
-			WSACleanup();
-			return -1;
-		}
-
-		return 0;
+		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { continue; }
+		std::cout << std::format("Connection established with at {} and port {}", ip, port);
 	}
 
 	int sendMsg(std::string message)
 	{
-		if (send(ClientSocket, message.c_str(), message.length(), 0) != 0)
+		if (send(ConnectSocket, message.c_str(), message.length(), 0) != 0)
 		{
 			return -1;
 		}
@@ -240,7 +210,7 @@ public:
 		std::string data{};
 
 		ZeroMemory(buff, sizeof(buff));
-		res = recv(ClientSocket, buff, 1000000, 0);
+		res = recv(ConnectSocket, buff, 1000000, 0);
 		if (res == 0)
 		{
 			return std::nullopt;
