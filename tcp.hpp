@@ -132,6 +132,7 @@ public:
 class tcpClient
 {
 private:
+	char* buff = new char[1000000];
 	std::string ip;
 	std::string port;
 	WSADATA data;
@@ -178,29 +179,30 @@ public:
 		}
 
 		ListenSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
-		if (ListenSocket != INVALID_SOCKET)
+		if (ListenSocket == INVALID_SOCKET)
 		{
 			std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
 			freeaddrinfo(addrResult);
 			WSACleanup();
+			return -1;
 		}
+
+		if (socket(ListenSocket, addrResult->ai_socktype, addrResult->ai_protocol) == SOCKET_ERROR)
+		{
+			closesocket(ListenSocket);
+			freeaddrinfo(addrResult);
+			WSACleanup();
+			std::cout << std::format("Socket creating error, code:{}\n", WSAGetLastError());
+			return -1;
+		}
+		
+		std::cout << std::format("Started listening at ip {} and port {}", ip, port);
 
 		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
 			freeaddrinfo(addrResult);
 			WSACleanup();
 			std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
-			return -1;
-		}
-
-		std::cout << std::format("Started listening at ip {} and port {}", ip, port);
-
-		if (bind(ListenSocket, addrResult->ai_addr, static_cast<int>(addrResult->ai_addrlen)) == SOCKET_ERROR)
-		{
-			closesocket(ListenSocket);
-			freeaddrinfo(addrResult);
-			WSACleanup();
-			std::cout << std::format("Bind error, code:{}\n", WSAGetLastError());
 			return -1;
 		}
 
@@ -235,7 +237,6 @@ public:
 	std::optional<std::string> readData() // Make as a cycle, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
-		char* buff = new char[1000000];
 		std::string data{};
 
 		ZeroMemory(buff, sizeof(buff));
