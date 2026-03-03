@@ -14,11 +14,11 @@ private:
 	ADDRINFO* addrResult;
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
-	std::vector<SOCKET> clients{};
 	WORD ver{ MAKEWORD(2, 2) };
 	std::string ip;
 	std::string port;
 public:
+	std::vector<SOCKET> clients{};
 	tcpServer(std::string_view ipArg, std::string_view portArg) : ip(ipArg), port(portArg)
 	{
 
@@ -141,6 +141,29 @@ public:
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ClientSocket, buff, 1000000, 0);
+		if (res == 0)
+		{
+			return std::nullopt;
+		}
+		data = buff;
+
+		if (data.has_value())
+		{
+			return data.value();
+		}
+		else
+		{
+			return std::nullopt;
+		}
+	}
+
+	std::optional<std::string> readDataFromSpecialClient(int clientNumber) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	{
+		int res{ 0 };
+		std::optional<std::string> data{};
+
+		ZeroMemory(buff, sizeof(buff));
+		res = recv(clients[clientNumber], buff, 1000000, 0);
 		if (res == 0)
 		{
 			return std::nullopt;
