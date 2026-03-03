@@ -2,6 +2,7 @@
 #include <Winsock2.h>
 #include <WS2tcpip.h>
 #include <optional>
+#include <vector>
 #pragma comment(lib, "Ws2_32.lib")
 
 class tcpServer
@@ -13,6 +14,7 @@ private:
 	ADDRINFO* addrResult;
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
+	std::vector<SOCKET> clients{};
 	WORD ver{ MAKEWORD(2, 2) };
 	std::string ip;
 	std::string port;
@@ -85,9 +87,30 @@ public:
 
 		return 0;
 	}
-	int acceptClient()
+	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int addrLen = NULL) // loop, it will break if error and return error code
 	{
-		ClientSocket = accept(ListenSocket, NULL, NULL);
+		for (std::size_t i{ 0 }; i <= clientsLimit; i++)
+		{
+			clients[i] = accept(ListenSocket, addr, NULL);
+
+			if (clients[i] == INVALID_SOCKET)
+			{
+				// std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
+
+				closesocket(ListenSocket);
+				freeaddrinfo(addrResult);
+				WSACleanup();
+
+				return WSAGetLastError();
+			}
+		}
+
+		return 0;
+	}
+
+	int acceptClient(sockaddr* addr = NULL, int addrLen = NULL)
+	{
+		ClientSocket = accept(ListenSocket, addr, NULL);
 		if (ClientSocket == INVALID_SOCKET)
 		{
 			// std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
@@ -96,11 +119,12 @@ public:
 			freeaddrinfo(addrResult);
 			WSACleanup();
 
-			return -1;
+			return WSAGetLastError();
 		}
 
 		return 0;
 	}
+
 	int sendMsg(std::string message)
 	{
 		if (send(ClientSocket, message.c_str(), message.length(), 0) <= 0)
@@ -235,7 +259,7 @@ public:
 	{
 		if (send(ConnectSocket, message.c_str(), message.length(), 0) == 0)
 		{
-			return -1;
+			return WSAGetLastError();
 		}
 
 		return 0;
