@@ -15,11 +15,12 @@ private:
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
 	WORD ver{ MAKEWORD(2, 2) };
+	std::size_t clientsLimit{ SOMAXCONN };
 	std::string ip;
 	std::string port;
 public:
 	std::vector<SOCKET> clients{};
-	tcpServer(std::string_view ipArg, std::string_view portArg) : ip(ipArg), port(portArg)
+	tcpServer(std::string_view ipArg, std::string_view portArg, std::size_t clientsLimitArg) : ip(ipArg), port(portArg), clientsLimit(clientsLimitArg)
 	{
 
 	}
@@ -75,7 +76,7 @@ public:
 			return WSAGetLastError();
 		}
 
-		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
+		if (listen(ListenSocket, clientsLimit) == SOCKET_ERROR)
 		{
 			// std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
 
@@ -134,6 +135,17 @@ public:
 
 		return 0;
 	}
+
+	int sendMsgToSpecificClient(std::string message, std::size_t clientIndex)
+	{
+		if (send(clients[clientIndex], message.c_str(), message.length(), 0) <= 0)
+		{
+			return WSAGetLastError();
+		}
+
+		return 0;
+	}
+
 	std::optional<std::string> readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
@@ -157,13 +169,13 @@ public:
 		}
 	}
 
-	std::optional<std::string> readDataFromSpecialClient(int clientNumber) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	std::optional<std::string> readDataFromSpecialClient(std::size_t clientIndex) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
 		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
-		res = recv(clients[clientNumber], buff, 1000000, 0);
+		res = recv(clients[clientIndex], buff, 1000000, 0);
 		if (res == 0)
 		{
 			return std::nullopt;
