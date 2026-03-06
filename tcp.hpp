@@ -15,12 +15,11 @@ private:
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
 	WORD ver{ MAKEWORD(2, 2) };
-	std::size_t clientsLimit{ SOMAXCONN };
 	std::string ip;
 	std::string port;
 public:
 	std::vector<SOCKET> clients{};
-	tcpServer(std::string_view ipArg, std::string_view portArg, std::size_t clientsLimitArg) : ip(ipArg), port(portArg), clientsLimit(clientsLimitArg)
+	tcpServer(std::string_view ipArg, std::string_view portArg) : ip(ipArg), port(portArg)
 	{
 
 	}
@@ -36,7 +35,7 @@ public:
 	{
 		if (WSAStartup(ver, &data) != 0)
 		{
-			// std::cout << std::format("WSAStartup error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("WSAStartup error, code:{}\n", WSAGetLastError());
 			return WSAGetLastError();
 		}
 
@@ -48,7 +47,7 @@ public:
 
 		if (getaddrinfo(ip.c_str(), port.c_str(), &hints, &addrResult) != 0)
 		{
-			// std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
 			WSACleanup();
 
 			return WSAGetLastError();
@@ -57,7 +56,7 @@ public:
 		ListenSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
 		if (ListenSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -67,7 +66,7 @@ public:
 
 		if (bind(ListenSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR)
 		{
-			// std::cout << std::format("Bind error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("Bind error, code:{}\n", WSAGetLastError());
 
 			closesocket(ListenSocket);
 			freeaddrinfo(addrResult);
@@ -76,9 +75,9 @@ public:
 			return WSAGetLastError();
 		}
 
-		if (listen(ListenSocket, clientsLimit) == SOCKET_ERROR)
+		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			// std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -114,10 +113,13 @@ public:
 		ClientSocket = accept(ListenSocket, addr, NULL);
 		if (ClientSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
+			std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
 
 			closesocket(ListenSocket);
-			freeaddrinfo(addrResult);
+			if (!WSAGetLastError() == 10093)
+			{
+				freeaddrinfo(addrResult);
+			}
 			WSACleanup();
 
 			return WSAGetLastError();
@@ -135,17 +137,6 @@ public:
 
 		return 0;
 	}
-
-	int sendMsgToSpecificClient(std::string message, std::size_t clientIndex)
-	{
-		if (send(clients[clientIndex], message.c_str(), message.length(), 0) <= 0)
-		{
-			return WSAGetLastError();
-		}
-
-		return 0;
-	}
-
 	std::optional<std::string> readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
@@ -169,13 +160,13 @@ public:
 		}
 	}
 
-	std::optional<std::string> readDataFromSpecialClient(std::size_t clientIndex) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	std::optional<std::string> readDataFromSpecialClient(int clientNumber) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
 		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
-		res = recv(clients[clientIndex], buff, 1000000, 0);
+		res = recv(clients[clientNumber], buff, 1000000, 0);
 		if (res == 0)
 		{
 			return std::nullopt;
