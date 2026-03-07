@@ -1,3 +1,3 @@
 # TCP-library
 (BETA)Simple tcp library for me and everyone. Beta version
-requierment:c++23
+requierment:c++20
