@@ -35,7 +35,6 @@ public:
 	{
 		if (WSAStartup(ver, &data) != 0)
 		{
-			std::cout << std::format("WSAStartup error, code:{}\n", WSAGetLastError());
 			return WSAGetLastError();
 		}
 
@@ -47,7 +46,6 @@ public:
 
 		if (getaddrinfo(ip.c_str(), port.c_str(), &hints, &addrResult) != 0)
 		{
-			std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
 			WSACleanup();
 
 			return WSAGetLastError();
@@ -56,7 +54,6 @@ public:
 		ListenSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
 		if (ListenSocket == INVALID_SOCKET)
 		{
-			std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -66,7 +63,6 @@ public:
 
 		if (bind(ListenSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR)
 		{
-			std::cout << std::format("Bind error, code:{}\n", WSAGetLastError());
 
 			closesocket(ListenSocket);
 			freeaddrinfo(addrResult);
@@ -77,7 +73,6 @@ public:
 
 		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
-			std::cout << std::format("Listen error, code:{}\n", WSAGetLastError());
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -113,7 +108,6 @@ public:
 		ClientSocket = accept(ListenSocket, addr, NULL);
 		if (ClientSocket == INVALID_SOCKET)
 		{
-			std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
 
 			closesocket(ListenSocket);
 			if (!WSAGetLastError() == 10093)
@@ -223,7 +217,6 @@ public:
 
 		if (getaddrinfo(ip.c_str(), port.c_str(), &hints, &addrResult) != 0)
 		{
-			// std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
 
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -234,7 +227,6 @@ public:
 		ConnectSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
 		if (ConnectSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
 			freeaddrinfo(addrResult);
 			WSACleanup();
 			return WSAGetLastError();
