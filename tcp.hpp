@@ -32,10 +32,10 @@ public:
 		{
 			closesocket(ListenSocket);
 		}
-		
+
 		for (std::size_t i{ 0 }; i < clients.size(); i++)
 		{
-			closesocket(clients[i]); 
+			closesocket(clients[i]);
 		}
 
 		freeaddrinfo(addrResult);
@@ -94,7 +94,7 @@ public:
 
 		return 0;
 	}
-	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int *addrLen = NULL) // loop, it will break if error and return error code
+	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int* addrLen = NULL) // loop, it will break if error and return error code
 	{
 		for (std::size_t i{ 0 }; i <= clientsLimit; i++)
 		{
@@ -109,7 +109,7 @@ public:
 		return 0;
 	}
 
-	int acceptClient(sockaddr* addr = NULL, int *addrLen = NULL)
+	int acceptClient(sockaddr* addr = NULL, int* addrLen = NULL)
 	{
 		ClientSocket = accept(ListenSocket, addr, addrLen);
 		if (ClientSocket == INVALID_SOCKET)
@@ -167,7 +167,7 @@ public:
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ClientSocket, buff, 1000000, 0);
-		if (res == 0)
+		if (res == 0 || res < 0)
 		{
 			return std::nullopt;
 		}
@@ -197,7 +197,7 @@ public:
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(clients[clientIndex], buff, 1000000, 0);
-		if (res == 0)
+		if (res == 0 || res < 0)
 		{
 			return std::nullopt;
 		}
@@ -328,7 +328,7 @@ public:
 				message[i] ^= key;
 			}
 		}
-		if (send(ConnectSocket, message.data(), message.length(), 0) <= 0)
+		if (send(ConnectSocket, message.data(), message.length(), 0) < 0)
 		{
 			return WSAGetLastError();
 		}
@@ -343,7 +343,7 @@ public:
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ConnectSocket, buff, 1000000, 0);
-		if (res == 0)
+		if (res == 0 || res < 0)
 		{
 			return std::nullopt;
 		}
