@@ -1,3 +1,5 @@
+#define NOT_INITIALIZED -512
+
 #include <iostream>
 #include <Winsock2.h>
 #include <WS2tcpip.h>
@@ -8,7 +10,6 @@
 class tcpServer
 {
 private:
-	char key{ 'h' };
 	char buff[1000000]{};
 	WSADATA data;
 	ADDRINFO hints;
@@ -16,32 +17,21 @@ private:
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	SOCKET ClientSocket{ INVALID_SOCKET };
 	WORD ver{ MAKEWORD(2, 2) };
-	std::size_t clientsLimit{ SOMAXCONN };
 	std::string ip;
 	std::string port;
 public:
 	std::vector<SOCKET> clients{};
-	tcpServer(std::string_view ipArg, std::string_view portArg, std::size_t clientsLimitArg) : ip(ipArg), port(portArg), clientsLimit(clientsLimitArg)
+	tcpServer(std::string_view ipArg, std::string_view portArg) : ip(ipArg), port(portArg)
 	{
 
 	}
 
 	void shutdownServer()
 	{
-		if (ListenSocket)
-		{
-			closesocket(ListenSocket);
-		}
-
-		for (std::size_t i{ 0 }; i < clients.size(); i++)
-		{
-			closesocket(clients[i]);
-		}
-
+		closesocket(ListenSocket);
 		freeaddrinfo(addrResult);
 		WSACleanup();
 	}
-
 
 	int initServer()
 	{
@@ -58,6 +48,7 @@ public:
 
 		if (getaddrinfo(ip.c_str(), port.c_str(), &hints, &addrResult) != 0)
 		{
+			// std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
 			WSACleanup();
 
 			return WSAGetLastError();
@@ -66,8 +57,6 @@ public:
 		ListenSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
 		if (ListenSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
-
 			freeaddrinfo(addrResult);
 			WSACleanup();
 
@@ -76,7 +65,6 @@ public:
 
 		if (bind(ListenSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR)
 		{
-
 			closesocket(ListenSocket);
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -84,7 +72,7 @@ public:
 			return WSAGetLastError();
 		}
 
-		if (listen(ListenSocket, clientsLimit) == SOCKET_ERROR)
+		if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR)
 		{
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -94,14 +82,18 @@ public:
 
 		return 0;
 	}
-	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int* addrLen = NULL) // loop, it will break if error and return error code
+	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int addrLen = NULL) // loop, it will break if error and return error code, blocking function
 	{
 		for (std::size_t i{ 0 }; i <= clientsLimit; i++)
 		{
-			clients[i] = accept(ListenSocket, addr, addrLen);
+			clients[i] = accept(ListenSocket, addr, NULL);
 
 			if (clients[i] == INVALID_SOCKET)
 			{
+				closesocket(ListenSocket);
+				freeaddrinfo(addrResult);
+				WSACleanup();
+
 				return WSAGetLastError();
 			}
 		}
@@ -109,13 +101,11 @@ public:
 		return 0;
 	}
 
-	int acceptClient(sockaddr* addr = NULL, int* addrLen = NULL)
+	int acceptClient(sockaddr* addr = NULL, int addrLen = NULL)
 	{
-		ClientSocket = accept(ListenSocket, addr, addrLen);
+		ClientSocket = accept(ListenSocket, addr, &addrLen);
 		if (ClientSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Accept error, code:{}\n", WSAGetLastError());
-
 			closesocket(ListenSocket);
 			freeaddrinfo(addrResult);
 			WSACleanup();
@@ -126,48 +116,23 @@ public:
 		return 0;
 	}
 
-	int sendMsg(std::string message, bool encrypt)
+	int sendMsg(std::string message)
 	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(ClientSocket, message.data(), message.length(), 0) <= 0)
+		if (send(ClientSocket, message.c_str(), message.length(), 0) <= 0)
 		{
 			return WSAGetLastError();
 		}
 
 		return 0;
 	}
-
-	int sendMsgToSpecificClient(std::string message, std::size_t clientIndex, bool encrypt = false)
-	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(clients[clientIndex], message.c_str(), message.length(), 0) <= 0)
-		{
-			return WSAGetLastError();
-		}
-
-		return 0;
-	}
-
-	std::optional<std::string> readData(bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	std::optional<std::string> readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
 		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ClientSocket, buff, 1000000, 0);
-		if (res == 0 || res < 0)
+		if (res == 0)
 		{
 			return std::nullopt;
 		}
@@ -175,13 +140,6 @@ public:
 
 		if (data.has_value())
 		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
 			return data.value();
 		}
 		else
@@ -190,14 +148,14 @@ public:
 		}
 	}
 
-	std::optional<std::string> readDataFromSpecialClient(std::size_t clientIndex, bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	std::optional<std::string> readDataFromSpecialClient(int clientNumber) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
 		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
-		res = recv(clients[clientIndex], buff, 1000000, 0);
-		if (res == 0 || res < 0)
+		res = recv(clients[clientNumber], buff, 1000000, 0);
+		if (res == 0)
 		{
 			return std::nullopt;
 		}
@@ -205,13 +163,6 @@ public:
 
 		if (data.has_value())
 		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
 			return data.value();
 		}
 		else
@@ -224,7 +175,7 @@ public:
 class tcpClient
 {
 private:
-	char key{ 'h' };
+	bool isSafeToContinue{false};
 	char buff[1000000]{};
 	std::string ip;
 	std::string port;
@@ -250,7 +201,7 @@ public:
 	{
 		if (WSAStartup(ver, &data) != 0)
 		{
-			// std::cout << std::format("WSAStartup error, code:{}\n", WSAGetLastError());
+			isSafeToContinue = false;
 			return WSAGetLastError();
 		}
 
@@ -261,8 +212,7 @@ public:
 
 		if (getaddrinfo(ip.c_str(), port.c_str(), &hints, &addrResult) != 0)
 		{
-			// std::cout << std::format("Getaddrinfo error, code:{}\n", WSAGetLastError());
-
+			isSafeToContinue = false;
 			freeaddrinfo(addrResult);
 			WSACleanup();
 
@@ -272,63 +222,31 @@ public:
 		ConnectSocket = socket(addrResult->ai_family, addrResult->ai_socktype, (int)addrResult->ai_protocol);
 		if (ConnectSocket == INVALID_SOCKET)
 		{
-			// std::cout << std::format("Socket creation error error, code:{}\n", WSAGetLastError());
+			isSafeToContinue = false;
 			freeaddrinfo(addrResult);
 			WSACleanup();
 			return WSAGetLastError();
 		}
-
+		isSafeToContinue = true;
 		return 0;
 	}
 
-	void connectLoop() // While isn't connected, trying to connect server
+	int connectLoop() // While isn't connected, trying to connect server
 	{
+		if (!isSafeToContinue) { return NOT_INITIALIZED; }
 		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { continue; }
 	}
 
-	int connectLoop(std::string_view ipArg, std::string_view portArg) // experimental
+	int connectToServer() // just default connect, non blocking
 	{
-		if (!addrResult)
-		{
-			freeaddrinfo(addrResult);
-		}
-		ZeroMemory(&hints, sizeof(hints));
-		if (getaddrinfo(ipArg.data(), portArg.data(), &hints, &addrResult) != 0)
-		{
-			return WSAGetLastError();
-		}
+		if (!isSafeToContinue) { return NOT_INITIALIZED; }
 		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
 	}
 
-	int connectToServer() // just default connect
+	int sendMsg(std::string_view message)
 	{
-		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
-	}
-
-	int connectToServer(std::string_view ipArg, std::string_view portArg) // experimental
-	{
-		if (!addrResult)
-		{
-			freeaddrinfo(addrResult);
-		}
-		ZeroMemory(&hints, sizeof(hints));
-		if (getaddrinfo(ipArg.data(), portArg.data(), &hints, &addrResult) != 0)
-		{
-			return WSAGetLastError();
-		}
-		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
-	}
-
-	int sendMsg(std::string message, bool encrypt)
-	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(ConnectSocket, message.data(), message.length(), 0) < 0)
+		if (!isSafeToContinue) { return NOT_INITIALIZED; }
+		if (send(ConnectSocket, message.data(), message.length(), 0) <= 0)
 		{
 			return WSAGetLastError();
 		}
@@ -336,14 +254,15 @@ public:
 		return 0;
 	}
 
-	std::optional<std::string> readData(bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	std::optional<std::string> readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed or server isn't initialized
 	{
 		int res{ 0 };
 		std::optional<std::string> data{};
+		if (!isSafeToContinue) { return std::nullopt; }
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ConnectSocket, buff, 1000000, 0);
-		if (res == 0 || res < 0)
+		if (res == 0)
 		{
 			return std::nullopt;
 		}
@@ -351,13 +270,6 @@ public:
 
 		if (data.has_value())
 		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
 			return data.value();
 		}
 		else
