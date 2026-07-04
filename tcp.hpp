@@ -136,16 +136,9 @@ public:
 		return 0;
 	}
 
-	int sendMsgToSpecificClient(std::string message, std::size_t clientIndex, bool encrypt = false)
+	int sendMsgToSpecificClient(char buff, int size, std::size_t clientIndex, bool encrypt = false)
 	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(clients[clientIndex], message.c_str(), message.length(), 0) <= 0)
+		if (send(clients[clientIndex], buff, size, 0) <= 0)
 		{
 			return WSAGetLastError();
 		}
@@ -153,40 +146,23 @@ public:
 		return 0;
 	}
 
-	std::optional<std::string> readData(bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	char* readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
-		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ClientSocket, buff, 1000000, 0);
 		if (res == 0)
 		{
-			return std::nullopt;
+			return 0;
 		}
-		data = buff;
-
-		if (data.has_value())
-		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
-			return data.value();
-		}
-		else
-		{
-			return std::nullopt;
-		}
+		return buff;
 	}
 
-	std::optional<std::string> readDataFromSpecialClient(std::size_t clientIndex, bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	char* readDataFromSpecialClient(std::size_t clientIndex) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
-		std::optional<std::string> data{};
+		
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(clients[clientIndex], buff, 1000000, 0);
@@ -194,23 +170,7 @@ public:
 		{
 			return std::nullopt;
 		}
-		data = buff;
-
-		if (data.has_value())
-		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
-			return data.value();
-		}
-		else
-		{
-			return std::nullopt;
-		}
+		return buff;
 	}
 };
 
@@ -276,21 +236,7 @@ public:
 
 	void connectLoop() // While isn't connected, trying to connect server
 	{
-		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { continue; }
-	}
-
-	int connectLoop(std::string_view ipArg, std::string_view portArg) // experimental
-	{
-		if (!addrResult)
-		{
-			freeaddrinfo(addrResult);
-		}
-		ZeroMemory(&hints, sizeof(hints));
-		if (getaddrinfo(ipArg.data(), portArg.data(), &hints, &addrResult) != 0)
-		{
-			return WSAGetLastError();
-		}
-		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
+		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { Sleep(50); continue; }
 	}
 
 	int connectToServer() // just default connect
@@ -298,30 +244,9 @@ public:
 		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
 	}
 
-	int connectToServer(std::string_view ipArg, std::string_view portArg) // experimental
+	int sendMsg(char* buff, int size)
 	{
-		if (!addrResult)
-		{
-			freeaddrinfo(addrResult);
-		}
-		ZeroMemory(&hints, sizeof(hints));
-		if (getaddrinfo(ipArg.data(), portArg.data(), &hints, &addrResult) != 0)
-		{
-			return WSAGetLastError();
-		}
-		return connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen);
-	}
-
-	int sendMsg(std::string message, bool encrypt)
-	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(ConnectSocket, message.data(), message.length(), 0) <= 0)
+		if (send(ConnectSocket, buff, size, 0) <= 0)
 		{
 			return WSAGetLastError();
 		}
@@ -329,43 +254,16 @@ public:
 		return 0;
 	}
 
-	int sendMsg(const char *message, int size)
-	{
-		if (send(ConnectSocket, message, size, 0) <= 0)
-		{
-			return WSAGetLastError();
-		}
-
-		return 0;
-	}
-
-	std::optional<std::string> readData(bool decrypt = false) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
+	char* readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
-		std::optional<std::string> data{};
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(ConnectSocket, buff, 1000000, 0);
 		if (res == 0)
 		{
-			return std::nullopt;
+			return 0;
 		}
-		data = buff;
-
-		if (data.has_value())
-		{
-			if (decrypt)
-			{
-				for (std::size_t i{ 0 }; i < data.value().size(); i++)
-				{
-					data.value()[i] ^= key;
-				}
-			}
-			return data.value();
-		}
-		else
-		{
-			return std::nullopt;
-		}
+		return buff;
 	}
 };
