@@ -126,16 +126,9 @@ public:
 		return 0;
 	}
 
-	int sendMsg(std::string message, bool encrypt)
+	int sendMsg(char buff, int size)
 	{
-		if (encrypt)
-		{
-			for (std::size_t i{ 0 }; i < message.size(); i++)
-			{
-				message[i] ^= key;
-			}
-		}
-		if (send(ClientSocket, message.data(), message.length(), 0) <= 0)
+		if (send(ClientSocket, buff, size, 0) <= 0)
 		{
 			return WSAGetLastError();
 		}
