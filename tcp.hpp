@@ -7,7 +7,7 @@
 
 class tcpServer
 {
-private:
+public:
 	char key{ 'h' };
 	char buff[1000000]{};
 	WSADATA data;
@@ -19,7 +19,7 @@ private:
 	std::size_t clientsLimit{ SOMAXCONN };
 	std::string ip;
 	std::string port;
-public:
+
 	std::vector<SOCKET> clients{};
 	tcpServer(std::string_view ipArg, std::string_view portArg, std::size_t clientsLimitArg) : ip(ipArg), port(portArg), clientsLimit(clientsLimitArg)
 	{
@@ -94,7 +94,7 @@ public:
 
 		return 0;
 	}
-	int acceptClients(int clientsLimit = SOMAXCONN, sockaddr* addr = NULL, int* addrLen = NULL) // loop, it will break if error and return error code
+	int acceptClients(sockaddr* addr = NULL, int* addrLen = NULL) // loop, it will break if error and return error code
 	{
 		for (std::size_t i{ 0 }; i <= clientsLimit; i++)
 		{
@@ -136,6 +136,8 @@ public:
 		return 0;
 	}
 
+	virtual int sendMsgV() {}
+
 	int sendMsgToSpecificClient(char buff, int size, std::size_t clientIndex, bool encrypt = false)
 	{
 		if (send(clients[clientIndex], buff, size, 0) <= 0)
@@ -159,6 +161,10 @@ public:
 		return buff;
 	}
 
+	virtual int readDataV() {}
+
+	virtual char* readDataFromSpecialClientV() {}
+
 	char* readDataFromSpecialClient(std::size_t clientIndex) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
@@ -168,7 +174,7 @@ public:
 		res = recv(clients[clientIndex], buff, 1000000, 0);
 		if (res == 0)
 		{
-			return std::nullopt;
+			return 0;
 		}
 		return buff;
 	}
@@ -176,8 +182,7 @@ public:
 
 class tcpClient
 {
-private:
-	char key{ 'h' };
+public:
 	char buff[1000000]{};
 	std::string ip;
 	std::string port;
@@ -186,7 +191,6 @@ private:
 	ADDRINFO* addrResult;
 	SOCKET ConnectSocket{ INVALID_SOCKET };
 	WORD ver{ MAKEWORD(2, 2) };
-public:
 	tcpClient(std::string ipArg, std::string portArg) : ip(ipArg), port(portArg)
 	{
 
@@ -236,7 +240,7 @@ public:
 
 	void connectLoop() // While isn't connected, trying to connect server
 	{
-		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { Sleep(50); continue; }
+		while (connect(ConnectSocket, addrResult->ai_addr, addrResult->ai_addrlen) == SOCKET_ERROR) { Sleep(50); }
 	}
 
 	int connectToServer() // just default connect
@@ -254,6 +258,8 @@ public:
 		return 0;
 	}
 
+	virtual int sendMsgV() {}
+
 	char* readData() // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
@@ -266,4 +272,6 @@ public:
 		}
 		return buff;
 	}
+
+	virtual char* readDataV() {}
 };
