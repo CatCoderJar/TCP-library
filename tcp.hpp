@@ -126,7 +126,7 @@ public:
 		return 0;
 	}
 
-	int sendMsg(char buff, int size)
+	int sendMsg(char* buff, int size)
 	{
 		if (send(ClientSocket, buff, size, 0) <= 0)
 		{
@@ -138,7 +138,7 @@ public:
 
 	virtual int sendMsgV() {}
 
-	int sendMsgToSpecificClient(char buff, int size, std::size_t clientIndex, bool encrypt = false)
+	int sendMsgToSpecificClient(char* buff, int size, std::size_t clientIndex, bool encrypt = false)
 	{
 		if (send(clients[clientIndex], buff, size, 0) <= 0)
 		{
@@ -168,7 +168,7 @@ public:
 	char* readDataFromSpecialClient(std::size_t clientIndex) // Make as a cycle, better as thread, will return std::nullopt if connection will be closed
 	{
 		int res{ 0 };
-		
+
 
 		ZeroMemory(buff, sizeof(buff));
 		res = recv(clients[clientIndex], buff, 1000000, 0);
